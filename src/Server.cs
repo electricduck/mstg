@@ -48,6 +48,7 @@ namespace mstg
 
         static void HandleMastodonNotification(object sender, StreamNotificationEventArgs e)
         {
+            // TODO: Handle message being sent from self
             Task.Run(async () =>
             {
                 var instance = await Clients.Mastodon.Client.GetInstanceV2();
@@ -74,7 +75,8 @@ namespace mstg
 
                     var command = await ExecuteCommand(
                         statusContent,
-                        new Entities.User {
+                        new Entities.User
+                        {
                             Service = Entities.User.Enums.Service.Mastodon,
                             ServiceId = notification.Account.Id,
                             ServiceName = notification.Account.DisplayName,
@@ -126,7 +128,8 @@ namespace mstg
                 var message = update.Message;
                 var command = await ExecuteCommand(
                     message.Text,
-                    new Entities.User {
+                    new Entities.User
+                    {
                         Service = Entities.User.Enums.Service.Telegram,
                         ServiceId = update.Message.From.Id.ToString(),
                         ServiceName = $"{update.Message.From.FirstName} {update.Message.From.LastName}",
@@ -137,7 +140,7 @@ namespace mstg
                 {
                     string commandResult = command.Success ? command.Text : $"⚠️ {command.FailureReason}";
 
-                    if(command.MediaUrl == null)
+                    if (command.MediaUrl == null)
                     {
                         await Clients.Telegram.Client.SendTextMessageAsync(
                             chatId: message.Chat,
@@ -147,7 +150,7 @@ namespace mstg
                     }
                     else
                     {
-                        switch(command.MediaType)
+                        switch (command.MediaType)
                         {
                             case Entities.Media.Enums.Type.Photo:
                                 await Clients.Telegram.Client.SendPhotoAsync(
@@ -176,12 +179,19 @@ namespace mstg
                     Entities.Post postItem = new Entities.Post();
                     Entities.Queue queueItem = new Entities.Queue();
 
+                    if (
+                        GenerateFullAccountName(mastodonStatus.Account.AccountName, instance.Domain) !=
+                            GenerateFullAccountName(Clients.Mastodon.Me.AccountName, instance.Domain)
+                    )
+                    {
+                        return;
+                    }
+
                     if (mastodonStatus.Reblogged == true)
                     {
                         mastodonStatus = mastodonStatus.Reblog;
                         statusMedia = mastodonStatus.MediaAttachments;
                     }
-
                     if (
                         mastodonStatus.Visibility != Visibility.Public &&
                         mastodonStatus.Visibility != Visibility.Unlisted
@@ -412,13 +422,14 @@ namespace mstg
             CommandOutput output;
 
             var commandArray = command.Trim().Split(" ");
-            var commandInput = new CommandInput {
+            var commandInput = new CommandInput
+            {
                 Arguments = commandArray.Skip(1).ToArray(),
                 Trigger = commandArray.First(),
                 User = user
             };
 
-            if(commandInput.User.Id == null)
+            if (commandInput.User.Id == null)
             {
                 commandInput.User = await mstg.Data.Users.GetUser(user);
             }
